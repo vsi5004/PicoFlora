@@ -5,6 +5,7 @@
 #include "stepper_screen.h"
 #include "screen_manager.h"
 #include "../../drivers/stepper/stepper_driver.h"
+#include "../../drivers/logging/logging.h"
 #include <stdio.h>
 
 // Screen objects
@@ -124,7 +125,7 @@ void stepper_screen_create(void) {
     lv_label_set_text(status_label, "Ready");
     lv_obj_align(status_label, LV_ALIGN_TOP_MID, 0, 230);  // Moved up from 255 to 230
     
-    printf("Stepper screen created successfully\n");
+    LOG_UI_INFO("Stepper screen created successfully");
 }
 
 void stepper_screen_update_progress(void) {

@@ -7,6 +7,7 @@
  */
 
 #include "screen_manager.h"
+#include "../../drivers/logging/logging.h"
 #include <stdio.h>
 #include "pico/time.h"  // Add this for hardware-independent timing
 
@@ -46,7 +47,7 @@ void screen_manager_init(void) {
     last_activity_time = to_ms_since_boot(get_absolute_time());  // Use hardware timer
     lock_screen_start_time = last_activity_time;  // Initialize lock screen timing
     
-    printf("Screen manager initialized with lock screen behavior\n");
+    LOG_UI_INFO("Screen manager initialized with lock screen behavior");
 }
 
 void screen_manager_add_screen(screen_id_t screen_id, lv_obj_t* screen_obj) {
@@ -61,7 +62,7 @@ void screen_manager_add_screen(screen_id_t screen_id, lv_obj_t* screen_obj) {
         }
         // Note: Individual UI elements handle their own timeout resets using screen_manager_handle_ui_event()
         
-        printf("Screen %d added to manager\n", screen_id);
+        LOG_UI_DEBUG("Screen %d added to manager", screen_id);
     }
 }
 
@@ -89,9 +90,9 @@ void screen_manager_switch_to(screen_id_t screen_id) {
             // For now, this will be handled in the main loop
         }
         
-        printf("Switched to screen %d with fade animation\n", screen_id);
+        LOG_UI_INFO("Switched to screen %d with fade animation", screen_id);
     } else {
-        printf("ERROR: Invalid screen ID %d or screen not initialized\n", screen_id);
+        LOG_UI_ERROR("Invalid screen ID %d or screen not initialized", screen_id);
     }
 }
 
@@ -124,7 +125,7 @@ void screen_manager_update(void) {
         uint32_t elapsed_time = current_time - last_activity_time;
         
         if (elapsed_time > TIMEOUT_MS) {
-            printf("Timeout reached after %lu ms - returning to lock screen\n", elapsed_time);
+            LOG_UI_INFO("Timeout reached after %lu ms - returning to lock screen", elapsed_time);
             screen_manager_switch_to(SCREEN_LOCK);
         }
     }

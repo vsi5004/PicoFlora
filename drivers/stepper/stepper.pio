@@ -10,6 +10,7 @@
 
 % c-sdk {
 #include "hardware/clocks.h"
+#include "../logging/logging.h"
 #include <stdio.h>
 
 static inline void stepper_step_program_init(PIO pio, uint sm, uint offset, uint pin) {
@@ -42,13 +43,10 @@ static inline void stepper_step_set_frequency(PIO pio, uint sm, uint32_t frequen
     if (divider > 65536.0f) {
         divider = 65536.0f;
         uint32_t actual_freq = system_clock / (divider * 2);
-        printf("WARNING: Requested frequency %lu Hz too low, using %lu Hz instead\n", 
+        LOG_STEPPER_WARN("Requested frequency %lu Hz too low, using %lu Hz instead", 
                frequency, actual_freq);
     }
     if (divider < 1.0f) divider = 1.0f;
-    
-    // printf("PIO frequency calculation: sys_clk=%lu, freq=%lu, divider=%.2f\n", 
-    //        system_clock, frequency, divider);
     
     pio_sm_set_clkdiv(pio, sm, divider);
 }
@@ -60,11 +58,11 @@ static inline void stepper_step_stop(PIO pio, uint sm) {
     // Clear the step pin to ensure it's low
     pio_sm_exec(pio, sm, pio_encode_set(pio_pins, 0));
     
-    printf("PIO SM disabled and pin cleared\n");
+    LOG_STEPPER_DEBUG("PIO SM disabled and pin cleared");
 }
 
 static inline void stepper_step_start(PIO pio, uint sm) {
     pio_sm_set_enabled(pio, sm, true);
-    printf("PIO SM enabled\n");
+    LOG_STEPPER_DEBUG("PIO SM enabled");
 }
 %}

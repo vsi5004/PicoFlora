@@ -8,6 +8,7 @@
 #include "hardware/pio.h"
 #include "hardware/i2c.h"
 #include "lvgl.h"
+#include "config.h"
 #include "bsp_i2c.h"
 #include "bsp_battery.h"
 #include "bsp_lcd_brightness.h"
@@ -20,19 +21,26 @@
 #include "drivers/stepper/stepper_mcp23017.h"
 #include "drivers/gpio_abstraction/gpio_abstraction.h"
 #include "drivers/mcp23017/mcp23017_class.h"
-
-// Main configuration
-#define CPU_FREQ_KHZ 220000  // 220MHz
+#include "drivers/logging/logging.h"
 
 // Forward declarations
 void set_cpu_clock(uint32_t freq_khz);
+
+// Initialization functions
+static void initialize_system(void);
+static void initialize_hardware_peripherals(void);
+static void initialize_rtc_with_defaults(void);
+static void initialize_stepper_motor(void);
+static void initialize_user_interface(void);
+static void run_main_application_loop(void);
 
 // CPU frequency management callback
 static bool cpu_reduced = false;
 
 void cpu_frequency_change_callback(uint32_t freq_khz) {
     set_cpu_clock(freq_khz);
-    cpu_reduced = (freq_khz < 100000);  // Consider anything below 100MHz as "reduced"
+    cpu_reduced = (freq_khz < CONFIG_CPU_FREQ_THRESHOLD);
+    LOG_POWER_DEBUG("CPU frequency changed to %lu kHz", freq_khz);
 }
 
 void set_cpu_clock(uint32_t freq_khz)
@@ -50,40 +58,53 @@ int main() {
     // Initialize stdio first
     stdio_init_all();
     
-    printf("PicoFlora - Smart Plant Watering Station Starting...\n");
+    // Initialize logging system early
+    log_init();
     
-    // Set CPU clock to 220MHz with proper peripheral clock setup
-    set_cpu_clock(CPU_FREQ_KHZ);
+    LOG_SYS_INFO("PicoFlora - Smart Plant Watering Station Starting...");
+    LOG_SYS_INFO("Version: %s", CONFIG_VERSION_STRING);
+    
+    // Set CPU clock to high performance mode
+    set_cpu_clock(CONFIG_CPU_FREQ_HIGH_KHZ);
+    LOG_POWER_INFO("CPU clock set to %d kHz", CONFIG_CPU_FREQ_HIGH_KHZ);
     bsp_i2c_init();
     lv_port_init();
     bsp_lcd_brightness_init();
-    bsp_lcd_brightness_set(80);
+    bsp_lcd_brightness_set(CONFIG_LCD_DEFAULT_BRIGHTNESS);
     bsp_pcf85063_init();
+    LOG_SYS_INFO("Hardware peripherals initialized");
     
     // Check if RTC has valid time, set default if needed
     struct tm now_tm;
     bsp_pcf85063_get_time(&now_tm);
-    if (now_tm.tm_year < 124 || now_tm.tm_year > 130) {
-        // Set default time (August 4, 2025, 12:00 PM)
-        now_tm.tm_year = 2025 - 1900; // Year since 1900
-        now_tm.tm_mon = 8 - 1;        // Month (0-11, so August = 7)
-        now_tm.tm_mday = 4;           // Day of month
-        now_tm.tm_hour = 12;          // Hour (24-hour format)
-        now_tm.tm_min = 0;            // Minute
-        now_tm.tm_sec = 0;            // Second
-        now_tm.tm_isdst = -1;         // Auto-detect DST
+    if (now_tm.tm_year < CONFIG_RTC_MIN_YEAR_OFFSET || now_tm.tm_year > CONFIG_RTC_MAX_YEAR_OFFSET) {
+        LOG_RTC_INFO("RTC time invalid, setting default time");
+        // Set default time from configuration
+        now_tm.tm_year = CONFIG_RTC_DEFAULT_YEAR - 1900; // Year since 1900
+        now_tm.tm_mon = CONFIG_RTC_DEFAULT_MONTH - 1;    // Month (0-11)
+        now_tm.tm_mday = CONFIG_RTC_DEFAULT_DAY;         // Day of month
+        now_tm.tm_hour = CONFIG_RTC_DEFAULT_HOUR;        // Hour (24-hour format)
+        now_tm.tm_min = CONFIG_RTC_DEFAULT_MINUTE;       // Minute
+        now_tm.tm_sec = CONFIG_RTC_DEFAULT_SECOND;       // Second
+        now_tm.tm_isdst = -1;                            // Auto-detect DST
         bsp_pcf85063_set_time(&now_tm);
+        LOG_RTC_INFO("Default time set: %04d-%02d-%02d %02d:%02d:%02d", 
+                    CONFIG_RTC_DEFAULT_YEAR, CONFIG_RTC_DEFAULT_MONTH, CONFIG_RTC_DEFAULT_DAY,
+                    CONFIG_RTC_DEFAULT_HOUR, CONFIG_RTC_DEFAULT_MINUTE, CONFIG_RTC_DEFAULT_SECOND);
+    } else {
+        LOG_RTC_INFO("RTC time valid: %04d-%02d-%02d %02d:%02d:%02d", 
+                    now_tm.tm_year + 1900, now_tm.tm_mon + 1, now_tm.tm_mday,
+                    now_tm.tm_hour, now_tm.tm_min, now_tm.tm_sec);
     }
     
     // Initialize GPIO abstraction layer
-    printf("Initializing GPIO abstraction layer...\n");
+    LOG_HW_INFO("Initializing GPIO abstraction layer...");
     gpio_abstraction_init();
     
     // Initialize stepper motor driver with MCP23017 enable pin (object-oriented approach)
-    // Address 0x27, Pin 0 (A0) for stepper enable control
-    printf("Setting up stepper motor with MCP23017 enable control...\n");
-    if (!stepper_init_with_mcp23017_enable(0x27, 0)) {
-        printf("Warning: MCP23017 stepper enable failed, falling back to basic stepper init\n");
+    LOG_STEPPER_INFO("Setting up stepper motor with MCP23017 enable control...");
+    if (!stepper_init_with_mcp23017_enable(CONFIG_MCP23017_ADDRESS, CONFIG_MCP23017_ENABLE_PIN)) {
+        LOG_STEPPER_ERROR("MCP23017 stepper enable failed, falling back to basic stepper init");
         stepper_driver_init();  // Fallback to basic initialization
     } else {
         // Demonstrate object-oriented pin access
@@ -91,17 +112,17 @@ int main() {
         gpio_pin_t *enable_pin = stepper_get_enable_pin();
         
         if (mcp_device && enable_pin) {
-            printf("Successfully created MCP23017 device and pin objects!\n");
-            printf("- MCP23017 device at address 0x%02X\n", 0x27);
-            printf("- Enable pin object ready for generic use\n");
+            LOG_STEPPER_INFO("Successfully created MCP23017 device and pin objects!");
+            LOG_HW_DEBUG("MCP23017 device at address 0x%02X", CONFIG_MCP23017_ADDRESS);
+            LOG_STEPPER_DEBUG("Enable pin object ready for generic use");
             
             // Example: You could get additional pins from the same device
-            gpio_pin_t *status_pin = mcp23017_class_get_pin_a(mcp_device, 1);  // Pin A1 for status LED
+            gpio_pin_t *status_pin = mcp23017_class_get_pin_a(mcp_device, CONFIG_MCP23017_STATUS_PIN);
             if (status_pin) {
-                printf("- Additional pin objects available (e.g., status LED on A1)\n");
+                LOG_HW_DEBUG("Additional pin objects available (e.g., status LED on A%d)", CONFIG_MCP23017_STATUS_PIN);
                 // Initialize as output for potential status indication
                 if (gpio_pin_init(status_pin, true)) {
-                    printf("- Status pin initialized as output\n");
+                    LOG_HW_DEBUG("Status pin initialized as output");
                 }
             }
         }
@@ -120,8 +141,9 @@ int main() {
     
     // Start with lock screen
     screen_manager_switch_to(SCREEN_LOCK);
+    LOG_UI_INFO("User interface initialized with lock screen");
     
-    printf("PicoFlora Started Successfully\n");
+    LOG_SYS_INFO("PicoFlora Started Successfully");
     
     // Main loop
     while (true) {
@@ -133,7 +155,7 @@ int main() {
         
         // Check if we should reduce CPU frequency for power savings
         if (screen_manager_should_reduce_cpu() && !cpu_reduced) {
-            cpu_frequency_change_callback(48000);  // 48MHz
+            cpu_frequency_change_callback(CONFIG_CPU_FREQ_LOW_KHZ);
         }
         
         // Update stepper motor state
@@ -149,7 +171,7 @@ int main() {
             lock_screen_update_time();
         }
         
-        sleep_ms(5);
+        sleep_ms(CONFIG_MAIN_LOOP_DELAY_MS);
     }
     
     return 0;

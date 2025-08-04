@@ -7,6 +7,7 @@
 
 #include "lock_screen.h"
 #include "bsp_pcf85063.h"
+#include "../../drivers/logging/logging.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -68,7 +69,7 @@ void lock_screen_create(void) {
     // Initialize with actual RTC time instead of hardcoded values
     lock_screen_update_time();
     
-    printf("Lock screen created successfully\n");
+    LOG_UI_INFO("Lock screen created successfully");
 }
 
 lv_obj_t* lock_screen_get_screen(void) {

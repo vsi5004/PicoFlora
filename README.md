@@ -10,17 +10,23 @@ PicoFlora is a smart plant watering station built on the Waveshare RP2350-Touch-
 - **Touch Navigation**: Touch anywhere on lock screen to unlock, 30-second timeout to lock
 - **High-Performance CPU**: Running at 220MHz for optimal performance
 - **Automatic Power Management**: MCP23017 I/O expander controls pump enable for power savings
+- **Consistent Logging**: Centralized logging system with categories, levels, and timestamps
+- **Centralized Configuration**: Single `config.h` file reduces magic numbers throughout codebase
 
 ## Project Structure
 
 ```
 PicoFlora/
 ├── main.c                      # Main application entry point with multi-screen setup
+├── config.h                    # Centralized configuration constants
 ├── CMakeLists.txt             # Build configuration
 ├── drivers/                   # Hardware abstraction layer
 │   ├── gpio_abstraction/      # Polymorphic GPIO pin interface
 │   │   ├── gpio_abstraction.h/.c  # Core pin abstraction with function pointers
 │   │   └── CMakeLists.txt     # GPIO abstraction build config
+│   ├── logging/              # Professional logging system
+│   │   ├── logging.h/.c      # Centralized logging with levels and categories
+│   │   └── CMakeLists.txt    # Logging module build config
 │   ├── mcp23017/             # MCP23017 I/O expander driver
 │   │   ├── mcp23017.h/.c     # Core I/O expander driver
 │   │   ├── mcp23017_class.h/.c    # Object-oriented pin management
@@ -86,6 +92,42 @@ PicoFlora/
 - **Automatic Power Management**: MCP23017 pin object controls TMC2209 enable pin
 - **Power Savings**: Motor is only powered when actively running
 - **Smart Enable/Disable**: Automatic enable on start, disable on completion
+
+### Logging System
+
+- **Centralized Logging**: Replaces scattered printf statements with structured logging
+- **Multi-Level Support**: DEBUG, INFO, WARN, ERROR, FATAL with runtime filtering
+- **Category-Based Filtering**: SYSTEM, HARDWARE, STEPPER, UI, POWER, RTC categories
+- **Timestamp Integration**: Precise millisecond timestamps from system clock
+- **Color-Coded Output**: ANSI color support for different log levels and categories
+- **Configurable Verbosity**: Runtime control of log levels and category filtering
+- **Clean API**: Convenient macros like `LOG_STEPPER_INFO()`, `LOG_UI_ERROR()`
+- **Consistent Format**: `[timestamp] [LEVEL] [CATEGORY] message`
+
+**Example Log Output:**
+```
+[     16.001] [INFO ] [UI ] Switched to screen 1 with fade animation
+[     22.458] [INFO ] [STEP] Starting stepper motor: 6185 steps
+[     23.355] [INFO ] [STEP] Stepper movement completed: 6185 steps
+[     67.967] [INFO ] [UI ] Timeout reached after 30006 ms - returning to lock screen
+```
+
+### Centralized Configuration Management
+
+- **Single Configuration File**: `config.h` consolidates all system constants
+- **Organized Sections**: CPU, Hardware, Stepper, UI, and Power Management settings
+- **Eliminates Magic Numbers**: All hardcoded values replaced with named constants
+- **Easy Tuning**: Single location for performance and behavior adjustments
+- **Type Safety**: Proper const definitions with appropriate data types
+- **Documentation**: Clear comments explaining each configuration parameter
+- **Consistent Naming**: CONFIG_* prefix for all system-wide constants
+
+**Configuration Categories:**
+- **CPU_FREQ_HIGH_KHZ**: System clock frequency (220MHz)
+- **MCP23017_ADDRESS/PIN**: I2C device configuration
+- **STEPPER_STEPS_PER_REV**: Motor characteristics (200 steps/revolution)
+- **UI_TIMEOUT_MS**: Screen timeout settings (30 seconds)
+- **I2C_TIMEOUT_US**: Communication timeouts
 
 ### Hardware Platform Features
 
@@ -187,7 +229,24 @@ PicoFlora/
 
 ## Code Architecture
 
+### Centralized Configuration (`config.h`)
+- **Single Source of Truth**: All system constants consolidated in one location
+- **Eliminates Magic Numbers**: Replaces hardcoded values throughout codebase
+- **Organized by Subsystem**: CPU, Hardware, Stepper, UI, and Power sections
+- **Easy Maintenance**: Single file to modify for system tuning
+- **Consistent Naming**: CONFIG_* prefix for all global constants
+- **Type Safety**: Proper const definitions with documentation
+
 ### Hardware Abstraction Layer (`drivers/`)
+
+**Logging System (`drivers/logging/`)**
+- **Centralized Architecture**: Single logging framework replacing scattered printf statements
+- **Multi-Level Filtering**: Runtime control of DEBUG, INFO, WARN, ERROR, FATAL levels
+- **Category-Based Organization**: SYSTEM, HARDWARE, STEPPER, UI, POWER, RTC categories
+- **Timestamp Precision**: Millisecond-accurate timestamps from RP2350 system clock
+- **Professional Output**: Structured format with ANSI color support
+- **Performance Optimized**: Minimal overhead with configurable verbosity
+- **Clean API**: Convenient macros for each category and level combination
 
 **GPIO Abstraction System (`drivers/gpio_abstraction/`)**
 - **Polymorphic Pin Interface**: Function pointer-based abstraction allowing uniform access to different pin types
@@ -210,12 +269,15 @@ PicoFlora/
 - **Modular Design**: Core driver and integration layer cleanly separated
 
 ### Main Application (`main.c`)
-- Initializes system clock to 220MHz
+- Initializes professional logging system with timestamp support
+- Uses centralized configuration from `config.h` for all system parameters
+- Initializes system clock to CONFIG_CPU_FREQ_HIGH_KHZ (220MHz)
 - Sets up PCF85063 RTC with default time fallback
-- Initializes object-oriented GPIO and MCP23017 systems
+- Initializes object-oriented GPIO and MCP23017 systems using CONFIG_MCP23017_*
 - Initializes multi-screen LVGL interface
 - Manages screen navigation and conditional updates
 - Runs main event loop with 5ms updates
+- All operations logged with appropriate categories and levels
 
 ### Multi-Screen UI (`lvgl/lvgl_screen/`)
 - **Screen Manager**: Touch unlock system with 30-second timeout
@@ -234,7 +296,59 @@ PicoFlora/
 
 ## Configuration Options
 
-Key parameters can be modified in `drivers/stepper/stepper_driver.h`:
+**Centralized System Configuration** in `config.h` (replaces scattered magic numbers):
+
+```c
+// CPU Performance Settings
+#define CONFIG_CPU_FREQ_HIGH_KHZ 220000    // 220MHz for optimal performance
+
+// Hardware Configuration
+#define CONFIG_MCP23017_ADDRESS 0x27       // I2C address for I/O expander
+#define CONFIG_MCP23017_ENABLE_PIN 0       // Pin A0 for stepper enable control
+#define CONFIG_I2C_TIMEOUT_US 10000        // I2C communication timeout
+
+// Stepper Motor Configuration  
+#define CONFIG_STEPPER_STEPS_PER_REV 200   // Steps per full revolution
+#define CONFIG_STEPPER_STEP_PIN 29         // GPIO pin for step pulses
+
+// UI System Configuration
+#define CONFIG_UI_TIMEOUT_MS 30000         // Screen timeout (30 seconds)
+#define CONFIG_UI_FADE_DURATION_MS 500     // Screen transition duration
+
+// Power Management
+#define CONFIG_POWER_SAVE_ENABLED true     // Enable automatic power savings
+```
+
+**Logging System Configuration** in `drivers/logging/logging.h`:
+
+```c
+// Log levels (ordered by severity)
+typedef enum {
+    LOG_LEVEL_DEBUG = 0,    // Detailed diagnostic information
+    LOG_LEVEL_INFO,         // General information messages  
+    LOG_LEVEL_WARN,         // Warning conditions
+    LOG_LEVEL_ERROR,        // Error conditions
+    LOG_LEVEL_FATAL,        // Fatal error conditions
+    LOG_LEVEL_NONE          // Disable all logging
+} log_level_t;
+
+// Log categories for filtering
+typedef enum {
+    LOG_CAT_SYSTEM = 0,     // System initialization and core functions
+    LOG_CAT_HARDWARE,       // Hardware-related messages (I2C, GPIO, etc.)
+    LOG_CAT_STEPPER,        // Stepper motor operations
+    LOG_CAT_UI,             // User interface and screen management
+    LOG_CAT_POWER,          // Power management and CPU frequency
+    LOG_CAT_RTC,            // Real-time clock operations
+} log_category_t;
+
+// Configuration
+#define LOG_MAX_MESSAGE_LENGTH 256
+#define LOG_TIMESTAMP_ENABLED true
+#define LOG_CATEGORY_ENABLED true
+```
+
+**Stepper Motor Configuration** in `drivers/stepper/stepper_driver.h`:
 
 ```c
 #define STEPPER_STEP_PIN 29          // GPIO pin for step signal

@@ -12,6 +12,7 @@ target_link_libraries(stepper
     pico_stdlib
     hardware_clocks
     hardware_pio
+    logging
 )
 
 target_include_directories(stepper PUBLIC

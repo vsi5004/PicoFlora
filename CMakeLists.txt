@@ -45,6 +45,7 @@ add_executable(PicoFlora
 
 # Hardware-specific examples in subdirectories:
 add_subdirectory(libraries)
+add_subdirectory(drivers/logging)
 add_subdirectory(drivers/stepper)
 add_subdirectory(drivers/mcp23017)
 add_subdirectory(lvgl/lvgl_screen)
@@ -55,6 +56,7 @@ target_link_libraries(PicoFlora
     bsp
     lvgl
     hardware_clocks
+    logging
     stepper
     mcp23017
     lvgl_screen
@@ -62,7 +64,9 @@ target_link_libraries(PicoFlora
 
 # Include directories
 target_include_directories(PicoFlora PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}/lvgl
+    ${CMAKE_CURRENT_SOURCE_DIR}/drivers/logging
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/stepper
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/mcp23017
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/gpio_abstraction

@@ -6,16 +6,17 @@
 
 #include "mcp23017_class.h"
 #include "../gpio_abstraction/gpio_abstraction.h"
+#include "../logging/logging.h"
 #include <stdio.h>
 #include <stdlib.h>
 
 mcp23017_class_t* mcp23017_class_create(uint8_t device_address) {
-    printf("Creating MCP23017 class instance for address 0x%02X\n", device_address);
+    LOG_HARDWARE_DEBUG("Creating MCP23017 class instance for address 0x%02X", device_address);
     
     // Allocate device structure
     mcp23017_class_t *device = malloc(sizeof(mcp23017_class_t));
     if (!device) {
-        printf("Failed to allocate memory for MCP23017 device\n");
+        LOG_HARDWARE_ERROR("Failed to allocate memory for MCP23017 device");
         return NULL;
     }
     
@@ -29,7 +30,7 @@ mcp23017_class_t* mcp23017_class_create(uint8_t device_address) {
     for (int i = 0; i < MCP23017_PIN_COUNT; i++) {
         device->pins[i] = gpio_create_mcp23017_pin(device_address, i);
         if (!device->pins[i]) {
-            printf("Failed to create pin object for pin %d\n", i);
+            LOG_HARDWARE_ERROR("Failed to create pin object for pin %d", i);
             // Clean up previously created pins
             for (int j = 0; j < i; j++) {
                 gpio_pin_destroy(device->pins[j]);
@@ -40,14 +41,14 @@ mcp23017_class_t* mcp23017_class_create(uint8_t device_address) {
     }
     
     device->initialized = true;
-    printf("MCP23017 class instance created successfully with %d pin objects\n", MCP23017_PIN_COUNT);
+    LOG_HARDWARE_INFO("MCP23017 class instance created successfully with %d pin objects", MCP23017_PIN_COUNT);
     return device;
 }
 
 void mcp23017_class_destroy(mcp23017_class_t *device) {
     if (!device) return;
     
-    printf("Destroying MCP23017 class instance for address 0x%02X\n", device->device_address);
+    LOG_HARDWARE_DEBUG("Destroying MCP23017 class instance for address 0x%02X", device->device_address);
     
     // Destroy all pin objects
     for (int i = 0; i < MCP23017_PIN_COUNT; i++) {
@@ -98,7 +99,7 @@ bool mcp23017_class_init_all_outputs(mcp23017_class_t *device) {
     for (int i = 0; i < MCP23017_PIN_COUNT; i++) {
         if (!gpio_pin_init(device->pins[i], true)) {
             success = false;
-            printf("Failed to initialize pin %d as output\n", i);
+            LOG_HARDWARE_ERROR("Failed to initialize pin %d as output", i);
         }
     }
     
@@ -112,7 +113,7 @@ bool mcp23017_class_init_all_inputs(mcp23017_class_t *device) {
     for (int i = 0; i < MCP23017_PIN_COUNT; i++) {
         if (!gpio_pin_init(device->pins[i], false)) {
             success = false;
-            printf("Failed to initialize pin %d as input\n", i);
+            LOG_HARDWARE_ERROR("Failed to initialize pin %d as input", i);
         }
     }
     
@@ -126,7 +127,7 @@ bool mcp23017_class_set_all_high(mcp23017_class_t *device) {
     for (int i = 0; i < MCP23017_PIN_COUNT; i++) {
         if (!gpio_pin_set_high(device->pins[i])) {
             success = false;
-            printf("Failed to set pin %d high\n", i);
+            LOG_HARDWARE_ERROR("Failed to set pin %d high", i);
         }
     }
     
@@ -140,7 +141,7 @@ bool mcp23017_class_set_all_low(mcp23017_class_t *device) {
     for (int i = 0; i < MCP23017_PIN_COUNT; i++) {
         if (!gpio_pin_set_low(device->pins[i])) {
             success = false;
-            printf("Failed to set pin %d low\n", i);
+            LOG_HARDWARE_ERROR("Failed to set pin %d low", i);
         }
     }
     

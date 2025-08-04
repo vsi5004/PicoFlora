@@ -6,6 +6,7 @@
 
 #include "gpio_abstraction.h"
 #include "../mcp23017/mcp23017.h"
+#include "../logging/logging.h"
 #include "pico/stdlib.h"
 #include "hardware/gpio.h"
 #include <stdio.h>
@@ -100,7 +101,7 @@ static bool mcp23017_gpio_init(gpio_pin_t *pin, bool is_output) {
     // Get or create device instance
     ctx->device = get_or_create_mcp23017_device(ctx->device_address);
     if (!ctx->device) {
-        printf("GPIO: Failed to initialize MCP23017 device at address 0x%02X\n", ctx->device_address);
+        LOG_HARDWARE_ERROR("GPIO: Failed to initialize MCP23017 device at address 0x%02X", ctx->device_address);
         return false;
     }
     
@@ -167,7 +168,7 @@ bool gpio_abstraction_init(void) {
     mcp23017_device_count = 0;
     
     abstraction_initialized = true;
-    printf("GPIO Abstraction: Initialized successfully\n");
+    LOG_HARDWARE_INFO("GPIO Abstraction: Initialized successfully");
     return true;
 }
 

@@ -5,6 +5,7 @@
  */
 
 #include "mcp23017.h"
+#include "../logging/logging.h"
 #include "pico/stdlib.h"
 #include "hardware/i2c.h"
 #include <stdio.h>
@@ -43,7 +44,7 @@ static bool mcp23017_write_register(mcp23017_device_t* device, uint8_t reg, uint
     int result = i2c_write_timeout_us(MCP23017_I2C_INSTANCE, device->i2c_addr, data, 2, false, MCP23017_I2C_TIMEOUT_US);
     
     if (result < 0) {
-        printf("MCP23017: Failed to write register 0x%02X to device 0x%02X\n", reg, device->i2c_addr);
+        LOG_HARDWARE_ERROR("MCP23017: Failed to write register 0x%02X to device 0x%02X", reg, device->i2c_addr);
         return false;
     }
     return true;
@@ -55,14 +56,14 @@ static bool mcp23017_read_register(mcp23017_device_t* device, uint8_t reg, uint8
     // Write register address
     int result = i2c_write_timeout_us(MCP23017_I2C_INSTANCE, device->i2c_addr, &reg, 1, true, MCP23017_I2C_TIMEOUT_US);
     if (result < 0) {
-        printf("MCP23017: Failed to write register address 0x%02X to device 0x%02X\n", reg, device->i2c_addr);
+        LOG_HARDWARE_ERROR("MCP23017: Failed to write register address 0x%02X to device 0x%02X", reg, device->i2c_addr);
         return false;
     }
     
     // Read the value
     result = i2c_read_timeout_us(MCP23017_I2C_INSTANCE, device->i2c_addr, value, 1, false, MCP23017_I2C_TIMEOUT_US);
     if (result < 0) {
-        printf("MCP23017: Failed to read register 0x%02X from device 0x%02X\n", reg, device->i2c_addr);
+        LOG_HARDWARE_ERROR("MCP23017: Failed to read register 0x%02X from device 0x%02X", reg, device->i2c_addr);
         return false;
     }
     
@@ -72,11 +73,11 @@ static bool mcp23017_read_register(mcp23017_device_t* device, uint8_t reg, uint8
 bool mcp23017_init(mcp23017_device_t* device, uint8_t i2c_addr) {
     if (!device) return false;
     
-    printf("Initializing MCP23017 at I2C address 0x%02X\n", i2c_addr);
+    LOG_HARDWARE_INFO("Initializing MCP23017 at I2C address 0x%02X", i2c_addr);
     
     // Validate I2C address range
     if (i2c_addr < 0x20 || i2c_addr > 0x27) {
-        printf("MCP23017: Invalid I2C address 0x%02X (must be 0x20-0x27)\n", i2c_addr);
+        LOG_HARDWARE_ERROR("MCP23017: Invalid I2C address 0x%02X (must be 0x20-0x27)", i2c_addr);
         return false;
     }
     
@@ -87,25 +88,25 @@ bool mcp23017_init(mcp23017_device_t* device, uint8_t i2c_addr) {
     uint8_t iocon_config = 0x00;
     
     if (!mcp23017_write_register(device, MCP23017_REG_IOCONA, iocon_config)) {
-        printf("MCP23017: Failed to configure IOCON register\n");
+        LOG_HARDWARE_ERROR("MCP23017: Failed to configure IOCON register");
         return false;
     }
     
     // Set all pins as inputs initially (0xFF = all inputs)
     if (!mcp23017_write_register(device, MCP23017_REG_IODIRA, 0xFF) ||
         !mcp23017_write_register(device, MCP23017_REG_IODIRB, 0xFF)) {
-        printf("MCP23017: Failed to configure direction registers\n");
+        LOG_HARDWARE_ERROR("MCP23017: Failed to configure direction registers");
         return false;
     }
     
     // Clear output latches
     if (!mcp23017_write_register(device, MCP23017_REG_OLATA, 0x00) ||
         !mcp23017_write_register(device, MCP23017_REG_OLATB, 0x00)) {
-        printf("MCP23017: Failed to clear output latches\n");
+        LOG_HARDWARE_ERROR("MCP23017: Failed to clear output latches");
         return false;
     }
     
-    printf("MCP23017 initialized successfully\n");
+    LOG_HARDWARE_INFO("MCP23017 initialized successfully");
     return true;
 }
 

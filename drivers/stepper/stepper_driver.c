@@ -7,6 +7,7 @@
 
 #include "stepper_driver.h"
 #include "../gpio_abstraction/gpio_abstraction.h"
+#include "../logging/logging.h"
 #include "pico/stdlib.h"
 #include "hardware/clocks.h"
 #include "hardware/pio.h"
@@ -91,9 +92,10 @@ static uint32_t calculate_target_frequency(void) {
         return target_freq;
     }
     
-    // Constant speed phase - only print once when entering this phase
+    // Constant speed phase - only log once when entering this phase
     if (!stepper_state.const_phase_printed) {
-        printf("CONST: freq=%lu, accel_steps=%ld\n", STEPPER_MAX_FREQ_HZ, adaptive_accel_steps);
+        LOG_STEPPER_DEBUG("Entering constant speed phase: freq=%lu Hz, accel_steps=%ld", 
+                         STEPPER_MAX_FREQ_HZ, adaptive_accel_steps);
         stepper_state.const_phase_printed = true;
     }
     return STEPPER_MAX_FREQ_HZ;
@@ -102,7 +104,7 @@ static uint32_t calculate_target_frequency(void) {
 // Update step frequency using PIO
 static void update_step_frequency(uint32_t frequency_hz) {
     if (!stepper_state.pio_initialized) {
-        printf("ERROR: PIO not initialized!\n");
+        LOG_STEPPER_ERROR("PIO not initialized!");
         return;
     }
     
@@ -120,7 +122,7 @@ static void update_step_frequency(uint32_t frequency_hz) {
         if (!stepper_state.pio_running) {
             stepper_step_start(STEPPER_PIO, STEPPER_PIO_SM);
             stepper_state.pio_running = true;
-            printf("Stepper frequency set to %lu Hz\n", frequency_hz);
+            LOG_STEPPER_DEBUG("Stepper frequency set to %lu Hz", frequency_hz);
         }
         // Don't spam frequency changes - they happen very frequently now
     }
@@ -131,7 +133,7 @@ static void stepper_enable_driver(void) {
     if (stepper_state.enable_pin && !stepper_state.enable_pin_active) {
         gpio_pin_set_low(stepper_state.enable_pin);  // Most stepper drivers are active low
         stepper_state.enable_pin_active = true;
-        printf("Stepper driver enabled\n");
+        LOG_STEPPER_DEBUG("Stepper driver enabled");
         sleep_ms(10);  // Allow driver to stabilize
     }
 }
@@ -140,7 +142,7 @@ static void stepper_disable_driver(void) {
     if (stepper_state.enable_pin && stepper_state.enable_pin_active) {
         gpio_pin_set_high(stepper_state.enable_pin);  // Disable (high for most drivers)
         stepper_state.enable_pin_active = false;
-        printf("Stepper driver disabled\n");
+        LOG_STEPPER_DEBUG("Stepper driver disabled");
     }
 }
 
@@ -149,7 +151,7 @@ void stepper_driver_init(void) {
 }
 
 void stepper_driver_init_with_enable_pin(gpio_pin_t *enable_pin) {
-    printf("Initializing PIO-based stepper driver on GPIO %d\n", STEPPER_STEP_PIN);
+    LOG_STEPPER_INFO("Initializing PIO-based stepper driver on GPIO %d", STEPPER_STEP_PIN);
     
     // Store enable pin reference
     stepper_state.enable_pin = enable_pin;
@@ -157,37 +159,37 @@ void stepper_driver_init_with_enable_pin(gpio_pin_t *enable_pin) {
     
     // Configure enable pin if provided
     if (enable_pin) {
-        printf("Configuring enable pin\n");
+        LOG_STEPPER_DEBUG("Configuring enable pin");
         if (!gpio_pin_init(enable_pin, true)) {  // true = output
-            printf("WARNING: Failed to configure enable pin as output\n");
+            LOG_STEPPER_ERROR("Failed to configure enable pin as output");
         } else {
             // Start with driver disabled (high for most drivers)
             gpio_pin_set_high(enable_pin);
-            printf("Enable pin configured and driver initially disabled\n");
+            LOG_STEPPER_DEBUG("Enable pin configured and driver initially disabled");
         }
     } else {
-        printf("No enable pin specified - driver always enabled\n");
+        LOG_STEPPER_DEBUG("No enable pin specified - driver always enabled");
     }
     
     // Check if PIO program can be added
     if (!pio_can_add_program(STEPPER_PIO, &stepper_step_program)) {
-        printf("ERROR: Cannot add PIO program - insufficient space!\n");
+        LOG_STEPPER_ERROR("Cannot add PIO program - insufficient space!");
         stepper_state.pio_initialized = false;
         return;
     }
     
     // Initialize PIO program
     stepper_state.pio_offset = pio_add_program(STEPPER_PIO, &stepper_step_program);
-    printf("PIO program loaded at offset %d\n", stepper_state.pio_offset);
+    LOG_STEPPER_DEBUG("PIO program loaded at offset %d", stepper_state.pio_offset);
     
     if (stepper_state.pio_offset < 0) {
-        printf("ERROR: Failed to load PIO program!\n");
+        LOG_STEPPER_ERROR("Failed to load PIO program!");
         stepper_state.pio_initialized = false;
         return;
     }
     
     stepper_step_program_init(STEPPER_PIO, STEPPER_PIO_SM, stepper_state.pio_offset, STEPPER_STEP_PIN);
-    printf("PIO state machine initialized\n");
+    LOG_STEPPER_DEBUG("PIO state machine initialized");
     
     // Initialize state
     stepper_state.state = STEPPER_IDLE;
@@ -201,17 +203,17 @@ void stepper_driver_init_with_enable_pin(gpio_pin_t *enable_pin) {
     stepper_state.pio_initialized = true;
     stepper_state.pio_running = false;
     
-    printf("PIO stepper driver initialized successfully\n");
-    printf("Frequency range: %d Hz to %d Hz\n", STEPPER_MIN_FREQ_HZ, STEPPER_MAX_FREQ_HZ);
+    LOG_STEPPER_INFO("PIO stepper driver initialized successfully");
+    LOG_STEPPER_INFO("Frequency range: %d Hz to %d Hz", STEPPER_MIN_FREQ_HZ, STEPPER_MAX_FREQ_HZ);
 }
 
 void stepper_driver_start(int32_t target_steps) {
     if (target_steps <= 0) {
-        printf("Invalid target steps: %ld\n", target_steps);
+        LOG_STEPPER_ERROR("Invalid target steps: %ld", target_steps);
         return;
     }
     
-    printf("Starting stepper motor: %ld steps\n", target_steps);
+    LOG_STEPPER_INFO("Starting stepper motor: %ld steps", target_steps);
     
     // Enable the stepper driver
     stepper_enable_driver();
@@ -231,7 +233,7 @@ void stepper_driver_start(int32_t target_steps) {
 }
 
 void stepper_driver_stop(void) {
-    printf("Stopping PIO stepper motor\n");
+    LOG_STEPPER_INFO("Stopping PIO stepper motor");
     
     // Stop PIO pulses
     update_step_frequency(0);
@@ -263,7 +265,7 @@ void stepper_driver_update(void) {
             stepper_state.current_steps = stepper_state.target_steps;
             stepper_driver_stop();
             stepper_state.state = STEPPER_COMPLETED;
-            printf("Stepper movement completed: %ld steps\n", stepper_state.current_steps);
+            LOG_STEPPER_INFO("Stepper movement completed: %ld steps", stepper_state.current_steps);
             return;
         }
         
@@ -286,7 +288,7 @@ void stepper_driver_update(void) {
         if (target_freq != stepper_state.current_frequency) {
             update_step_frequency(target_freq);
             // Print every update to see what's happening
-            printf("Steps: %ld/%ld, State: %d, Freq: %lu Hz\n", 
+            LOG_STEPPER_DEBUG("Steps: %ld/%ld, State: %d, Freq: %lu Hz", 
                    stepper_state.current_steps, stepper_state.target_steps,
                    stepper_state.state, target_freq);
         }
