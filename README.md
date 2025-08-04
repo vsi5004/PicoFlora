@@ -2,20 +2,21 @@
 
 ## Project Overview
 
-PicoFlora is a smart plant watering station built on the RP2350 microcontroller with the following features:
+PicoFlora is a smart plant watering station built on the Waveshare RP2350-Touch-LCD-2.8 development board with additional components for precision plant care automation. The system features:
 
 - **Multi-Screen LVGL Interface**: Lock screen with touch unlock and automatic timeout
 - **Real-Time Clock**: PCF85063 RTC integration with live time display on lock screen
-- **PIO-Based Stepper Control**: Precise stepper motor control with adaptive acceleration
+- **Precision Pump Control**: BigTreeTech TMC2209-driven Boxer 9QX peristaltic pump for accurate water dosing
 - **Touch Navigation**: Touch anywhere on lock screen to unlock, 30-second timeout to lock
 - **High-Performance CPU**: Running at 220MHz for optimal performance
+- **Automatic Power Management**: MCP23017 I/O expander controls pump enable for power savings
 
 ## Project Structure
 
 ```
 PicoFlora/
 ├── main.c                      # Main application entry point with multi-screen setup
-├── CMakeLists.txt             # Build configuration (renamed from hello_serial)
+├── CMakeLists.txt             # Build configuration
 ├── lvgl/
 │   ├── lv_port/              # LVGL hardware abstraction layer
 │   └── lvgl_screen/          # Multi-screen UI system
@@ -33,7 +34,7 @@ PicoFlora/
 │   ├── stepper_io_integration.h/.c  # Stepper power management
 │   └── CMakeLists.txt        # MCP23017 module build config
 └── libraries/                # External libraries (BSP, LVGL, FatFS)
-    └── bsp/                  # Board support with PCF85063 RTC integration
+    └── bsp/                  # Board support from Waveshare
 ```
 
 ## Key Features
@@ -68,15 +69,34 @@ PicoFlora/
 
 ### PIO-Based Stepper Motor Control with Power Management
 
-- **Pin Configuration**: GPIO 29 (step pin)
+- **Pin Configuration**: GPIO 29 (step pin to TMC2209)
 - **PIO Implementation**: Hardware-timed square wave generation
 - **Frequency Range**: 2,000-5,000 Hz step frequency
 - **Adaptive Acceleration**: Scales from 200-1000 steps based on movement distance
 - **Timing Precision**: ±1-2μs accuracy validated with oscilloscope
 - **States**: Idle → Accelerating → Running → Decelerating → Completed
-- **Automatic Power Management**: MCP23017 I/O expander controls stepper enable pin
+- **Stepper Driver**: BigTreeTech TMC2209 for silent operation and precision control
+- **Pump Integration**: Boxer 9QX peristaltic pump for accurate water dosing
+- **Automatic Power Management**: MCP23017 I/O expander controls TMC2209 enable pin
 - **Power Savings**: Motor is only powered when actively running
 - **Smart Enable/Disable**: Automatic enable on start, disable on completion
+
+### Hardware Platform Features
+
+**Waveshare RP2350-Touch-LCD-2.8 Specifications:**
+- **Processor**: Dual-core ARM Cortex-M33 @ 150MHz (overclocked to 220MHz)
+- **Memory**: 520KB SRAM, 4MB Flash
+- **Display**: 2.8" IPS LCD, 320×240 resolution, ST7789 controller
+- **Touch**: Capacitive touch with CST328 controller
+- **Sensors**: PCF85063 RTC, QMI8658 6-axis IMU
+- **Power**: USB-C charging, battery management, power monitoring
+- **Form Factor**: Compact development board with integrated peripherals
+
+**Performance Optimizations:**
+- **CPU Overclocking**: 220MHz operation for responsive UI and precise timing
+- **I2C Bus Management**: Single bus handles multiple devices efficiently
+- **PIO Utilization**: Hardware-timed stepper control without CPU blocking
+- **Power Management**: Dynamic frequency scaling and component power control
 
 ### Real-Time Clock Integration
 
@@ -95,24 +115,40 @@ PicoFlora/
 
 ## Hardware Requirements
 
-- **Microcontroller**: Raspberry Pi Pico 2 (RP2350)
-- **Display**: ST7789 LCD with touch controller (CST328)
-- **Real-Time Clock**: PCF85063 I2C RTC chip
-- **I/O Expander**: MCP23017 I2C 16-bit I/O expander
-- **Stepper Motor**: Any stepper motor compatible with step/direction control
-- **Driver**: Stepper motor driver board (TMC2209 recommended, A4988, DRV8825, etc.)
+**Base Platform:**
+- **[Waveshare RP2350-Touch-LCD-2.8](https://www.waveshare.com/wiki/RP2350-Touch-LCD-2.8#Introduction)** - Complete development board featuring:
+  - Raspberry Pi Pico 2 (RP2350) microcontroller
+  - 2.8" ST7789 320×240 IPS LCD display
+  - CST328 capacitive touch controller
+  - PCF85063 I2C real-time clock
+  - QMI8658 6-axis IMU sensor
+  - Battery management system
+  - Onboard USB-C connector and power management
+
+**Additional Components:**
+- **MCP23017 I2C I/O Expander** - External breakout board for stepper enable control
+- **BigTreeTech TMC2209 Stepper Driver** - Silent stepper motor driver with UART control
+- **Boxer 9QX Peristaltic Pump** - Precision dosing pump for plant watering applications
 
 ## Pin Connections
 
-- **GPIO 29**: Stepper motor step pin
-- **I2C1 (GPIO 2/3)**: Communication bus for all I2C devices:
-  - **MCP23017**: Address 0x27 (I/O expander for stepper enable)
-  - **CST328**: Address 0x1A (touch controller)
-  - **PCF85063**: Address 0x51 (RTC)
-  - **QMI8658**: Address 0x6B (sensor)
-- **MCP23017 Pin A0**: Stepper motor enable control
-- **Display/Touch**: ST7789 LCD and CST328 touch controller via BSP
-- **Power Management**: Battery monitoring system integrated
+**Waveshare RP2350-Touch-LCD-2.8 Built-in Connections:**
+- **GPIO 29**: Stepper motor step pin (connected to TMC2209 STEP)
+- **I2C1 (GPIO 6/7)**: Onboard I2C bus connecting:
+  - **CST328**: Address 0x1A (capacitive touch controller)
+  - **PCF85063**: Address 0x51 (real-time clock)
+  - **QMI8658**: Address 0x6B (6-axis IMU sensor)
+- **ST7789 Display**: Connected via SPI (handled by BSP layer)
+- **Battery Management**: Integrated power monitoring and charging
+
+**External Connections:**
+- **MCP23017**: Address 0x27 (connected to I2C1 bus via breakout board)
+  - **Pin A0**: TMC2209 stepper driver enable control
+- **TMC2209 Stepper Driver**: Connected to Boxer 9QX peristaltic pump
+  - **STEP**: GPIO 29 (step pulses from RP2350)
+  - **DIR**: Left unconnected 
+  - **EN**: MCP23017 Pin A0 (automatic enable/disable control)
+- **Boxer 9QX Pump**: Connected to TMC2209 stepper output
 
 ## Build Instructions
 
@@ -166,14 +202,16 @@ PicoFlora/
 
 ## Future Enhancements for Plant Watering Station
 
-1. **Watering Scheduling**: Time-based automatic watering with RTC integration
-2. **Sensor Integration**: Soil moisture, light level, and temperature sensors
-3. **Water Level Monitoring**: Reservoir level detection and alerts
-4. **Data Logging**: Historical watering events and sensor readings
-5. **Multiple Plants**: Support for multiple plant zones with individual schedules
-6. **Pump Control**: Precise water volume dispensing using stepper-controlled pumps
-7. **User Settings**: Configurable watering schedules and sensor thresholds
-8. **SD Card Storage**: Long-term data logging and configuration backup
+1. **Automated Watering Schedules**: Time-based watering with RTC integration and multiple daily cycles
+2. **Sensor Integration**: Soil moisture sensors for demand-based watering triggers
+3. **Multi-Plant Support**: Multiple pump channels with individual schedules and dosing profiles
+4. **Water Level Monitoring**: Reservoir level detection with low-water alerts
+5. **Environmental Monitoring**: Light level and temperature sensors using onboard QMI8658 IMU
+6. **Data Logging**: Historical watering events, sensor readings, and pump performance metrics
+7. **Wireless Connectivity**: Wi-Fi module for remote monitoring and control
+8. **Precision Dosing**: Calibrated pump control for fertilizer and nutrient solutions
+9. **User Interface Enhancements**: Settings screens for pump calibration and schedule configuration
+10. **SD Card Integration**: Long-term data storage and configuration backup using FatFS library
 
 ## Configuration Options
 
@@ -206,25 +244,3 @@ typedef enum {
 
 #define TIMEOUT_MS 30000            // 30-second timeout to lock screen
 ```
-
-## Troubleshooting
-
-- **No display output**: Check ST7789 display connections and BSP configuration
-- **Touch not working**: Verify CST328 touch controller I2C connections
-- **Motor not moving**: Verify GPIO 29 connection and TMC2209 driver configuration
-- **Erratic movement**: Check power supply stability and driver microstepping settings
-- **Lock screen not responding**: Check touch event handlers and screen initialization
-- **Auto-lock not working**: Verify timeout logic and lv_tick_get() functionality
-- **Time not updating on lock screen**: Check PCF85063 I2C connections and RTC initialization
-- **Build errors**: Verify all BSP dependencies are linked in CMakeLists.txt
-
-## Technical Achievements
-
-- **Hardware-Accurate Timing**: PIO generates square waves with ±1-2μs precision
-- **Adaptive Algorithm**: Acceleration scales intelligently with movement distance
-- **Lock Screen System**: Touch-to-unlock with 30-second auto-timeout functionality
-- **Smooth Animations**: 500ms fade transitions between lock and stepper screens
-- **Real-Time Integration**: Live clock display from hardware RTC on lock screen
-- **Modular Architecture**: Clean separation of UI, motor control, and hardware layers
-
-This project provides a robust foundation for smart plant watering automation and demonstrates advanced embedded GUI development with precise motor control on the RP2350 platform.
