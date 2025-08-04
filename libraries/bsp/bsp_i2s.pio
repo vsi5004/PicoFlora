@@ -1,0 +1,20 @@
+; 声音为32位，其中左右声道各占16位，按照先左声道后右声道的顺序传输
+; I2S规定从最高位（MSB）开始传送数据
+
+.program i2s_pio
+.side_set 2
+
+;                              |--LRCLK 
+;                              ||-BCLK 
+
+set x, 14               side 0b01
+OutL:
+    out pins, 1         side 0b00
+    jmp x-- OutL        side 0b01
+out pins, 1             side 0b10
+set x, 14               side 0b11
+
+OutR:
+    out pins, 1         side 0b10
+    jmp x-- OutR        side 0b11
+out pins, 1             side 0b00

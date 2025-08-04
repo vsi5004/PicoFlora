@@ -1,0 +1,70 @@
+; Simple stepper motor PIO program
+; Generates precise step pulses with configurable frequency
+
+.program stepper_step
+
+.wrap_target
+    set pins, 1
+    set pins, 0
+.wrap
+
+% c-sdk {
+#include "hardware/clocks.h"
+#include <stdio.h>
+
+static inline void stepper_step_program_init(PIO pio, uint sm, uint offset, uint pin) {
+    pio_sm_config c = stepper_step_program_get_default_config(offset);
+    
+    // Configure the step pin as output
+    sm_config_set_set_pins(&c, pin, 1);
+    
+    // Set the GPIO function to PIO
+    pio_gpio_init(pio, pin);
+    
+    // Set pin direction to output
+    pio_sm_set_consecutive_pindirs(pio, sm, pin, 1, true);
+    
+    // Load and start the program
+    pio_sm_init(pio, sm, offset, &c);
+}
+
+static inline void stepper_step_set_frequency(PIO pio, uint sm, uint32_t frequency) {
+    // Each loop takes 2 cycles (set high + set low)
+    // frequency = PIO_clock / 2
+    // PIO_clock = system_clock / divider
+    // So: divider = system_clock / (frequency * 2)
+    
+    uint32_t system_clock = clock_get_hz(clk_sys);
+    float divider = (float)system_clock / (frequency * 2.0f);
+    
+    // Ensure divider is within valid range (1.0 to 65536.0)
+    // If divider would be too high, increase the minimum frequency
+    if (divider > 65536.0f) {
+        divider = 65536.0f;
+        uint32_t actual_freq = system_clock / (divider * 2);
+        printf("WARNING: Requested frequency %lu Hz too low, using %lu Hz instead\n", 
+               frequency, actual_freq);
+    }
+    if (divider < 1.0f) divider = 1.0f;
+    
+    // printf("PIO frequency calculation: sys_clk=%lu, freq=%lu, divider=%.2f\n", 
+    //        system_clock, frequency, divider);
+    
+    pio_sm_set_clkdiv(pio, sm, divider);
+}
+
+static inline void stepper_step_stop(PIO pio, uint sm) {
+    // Disable the state machine
+    pio_sm_set_enabled(pio, sm, false);
+    
+    // Clear the step pin to ensure it's low
+    pio_sm_exec(pio, sm, pio_encode_set(pio_pins, 0));
+    
+    printf("PIO SM disabled and pin cleared\n");
+}
+
+static inline void stepper_step_start(PIO pio, uint sm) {
+    pio_sm_set_enabled(pio, sm, true);
+    printf("PIO SM enabled\n");
+}
+%}
