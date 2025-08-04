@@ -21,7 +21,7 @@ extern lv_obj_t *current_steps_label;
 extern lv_obj_t *target_steps_label;
 extern lv_obj_t *status_label;
 
-#include "stepper_driver.h"
+#include "../../drivers/stepper/stepper_driver.h"
 
 // Configuration
 #define MIN_STEPS 1

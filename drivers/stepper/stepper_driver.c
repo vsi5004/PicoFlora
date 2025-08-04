@@ -6,6 +6,7 @@
  */
 
 #include "stepper_driver.h"
+#include "../gpio_abstraction/gpio_abstraction.h"
 #include "pico/stdlib.h"
 #include "hardware/clocks.h"
 #include "hardware/pio.h"
@@ -33,6 +34,8 @@ static struct {
     bool pio_running;  // Track if PIO is currently running
     bool const_phase_printed;  // Flag to avoid repeated CONST messages
     uint32_t steps_at_last_update;  // For accurate step counting
+    gpio_pin_t *enable_pin;  // Optional enable pin (can be NULL)
+    bool enable_pin_active;  // Track if enable pin is currently active
 } stepper_state = {
     .state = STEPPER_IDLE,
     .current_steps = 0,
@@ -46,7 +49,9 @@ static struct {
     .pio_initialized = false,
     .pio_running = false,
     .const_phase_printed = false,
-    .steps_at_last_update = 0
+    .steps_at_last_update = 0,
+    .enable_pin = NULL,
+    .enable_pin_active = false
 };
 
 // Helper function to calculate frequency based on current position
@@ -121,8 +126,48 @@ static void update_step_frequency(uint32_t frequency_hz) {
     }
 }
 
+// Helper functions for enable pin control
+static void stepper_enable_driver(void) {
+    if (stepper_state.enable_pin && !stepper_state.enable_pin_active) {
+        gpio_pin_set_low(stepper_state.enable_pin);  // Most stepper drivers are active low
+        stepper_state.enable_pin_active = true;
+        printf("Stepper driver enabled\n");
+        sleep_ms(10);  // Allow driver to stabilize
+    }
+}
+
+static void stepper_disable_driver(void) {
+    if (stepper_state.enable_pin && stepper_state.enable_pin_active) {
+        gpio_pin_set_high(stepper_state.enable_pin);  // Disable (high for most drivers)
+        stepper_state.enable_pin_active = false;
+        printf("Stepper driver disabled\n");
+    }
+}
+
 void stepper_driver_init(void) {
+    stepper_driver_init_with_enable_pin(NULL);
+}
+
+void stepper_driver_init_with_enable_pin(gpio_pin_t *enable_pin) {
     printf("Initializing PIO-based stepper driver on GPIO %d\n", STEPPER_STEP_PIN);
+    
+    // Store enable pin reference
+    stepper_state.enable_pin = enable_pin;
+    stepper_state.enable_pin_active = false;
+    
+    // Configure enable pin if provided
+    if (enable_pin) {
+        printf("Configuring enable pin\n");
+        if (!gpio_pin_init(enable_pin, true)) {  // true = output
+            printf("WARNING: Failed to configure enable pin as output\n");
+        } else {
+            // Start with driver disabled (high for most drivers)
+            gpio_pin_set_high(enable_pin);
+            printf("Enable pin configured and driver initially disabled\n");
+        }
+    } else {
+        printf("No enable pin specified - driver always enabled\n");
+    }
     
     // Check if PIO program can be added
     if (!pio_can_add_program(STEPPER_PIO, &stepper_step_program)) {
@@ -168,6 +213,9 @@ void stepper_driver_start(int32_t target_steps) {
     
     printf("Starting stepper motor: %ld steps\n", target_steps);
     
+    // Enable the stepper driver
+    stepper_enable_driver();
+    
     // Reset state
     stepper_state.current_steps = 0;
     stepper_state.target_steps = target_steps;
@@ -191,6 +239,9 @@ void stepper_driver_stop(void) {
     // Update state
     stepper_state.state = STEPPER_IDLE;
     stepper_state.current_frequency = 0;
+    
+    // Disable the stepper driver to save power
+    stepper_disable_driver();
 }
 
 void stepper_driver_update(void) {

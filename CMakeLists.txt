@@ -38,13 +38,15 @@ pico_sdk_init()
 add_executable(PicoFlora
         main.c
         lvgl/lv_port/lv_port.c
-        mcp23017/stepper_io_integration.c
+        drivers/mcp23017/mcp23017_class.c
+        drivers/gpio_abstraction/gpio_abstraction.c
+        drivers/stepper/stepper_mcp23017.c
         )
 
 # Hardware-specific examples in subdirectories:
 add_subdirectory(libraries)
-add_subdirectory(stepper)
-add_subdirectory(mcp23017)
+add_subdirectory(drivers/stepper)
+add_subdirectory(drivers/mcp23017)
 add_subdirectory(lvgl/lvgl_screen)
 
 # pull in common dependencies
@@ -61,8 +63,9 @@ target_link_libraries(PicoFlora
 # Include directories
 target_include_directories(PicoFlora PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/lvgl
-    ${CMAKE_CURRENT_SOURCE_DIR}/stepper
-    ${CMAKE_CURRENT_SOURCE_DIR}/mcp23017
+    ${CMAKE_CURRENT_SOURCE_DIR}/drivers/stepper
+    ${CMAKE_CURRENT_SOURCE_DIR}/drivers/mcp23017
+    ${CMAKE_CURRENT_SOURCE_DIR}/drivers/gpio_abstraction
     ${CMAKE_CURRENT_SOURCE_DIR}/lvgl/lvgl_screen
     )
 

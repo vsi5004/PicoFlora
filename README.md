@@ -17,6 +17,19 @@ PicoFlora is a smart plant watering station built on the Waveshare RP2350-Touch-
 PicoFlora/
 ├── main.c                      # Main application entry point with multi-screen setup
 ├── CMakeLists.txt             # Build configuration
+├── drivers/                   # Hardware abstraction layer
+│   ├── gpio_abstraction/      # Polymorphic GPIO pin interface
+│   │   ├── gpio_abstraction.h/.c  # Core pin abstraction with function pointers
+│   │   └── CMakeLists.txt     # GPIO abstraction build config
+│   ├── mcp23017/             # MCP23017 I/O expander driver
+│   │   ├── mcp23017.h/.c     # Core I/O expander driver
+│   │   ├── mcp23017_class.h/.c    # Object-oriented pin management
+│   │   └── CMakeLists.txt    # MCP23017 module build config
+│   └── stepper/              # PIO-based stepper motor driver
+│       ├── stepper_driver.h/.c    # Driver interface with adaptive acceleration
+│       ├── stepper_mcp23017.h/.c  # MCP23017 integration for power management
+│       ├── stepper.pio       # PIO state machine for precise timing
+│       └── CMakeLists.txt    # Stepper module build config
 ├── lvgl/
 │   ├── lv_port/              # LVGL hardware abstraction layer
 │   └── lvgl_screen/          # Multi-screen UI system
@@ -24,15 +37,6 @@ PicoFlora/
 │       ├── lock_screen.h/.c       # Lock screen with time/date display
 │       ├── screen_manager.h/.c    # Touch unlock and timeout manager
 │       └── CMakeLists.txt         # UI module build config
-├── stepper/                   # PIO-based stepper motor driver
-│   ├── stepper_driver.h       # Driver interface with adaptive acceleration
-│   ├── stepper_driver.c       # PIO-based implementation
-│   ├── stepper.pio           # PIO state machine for precise timing
-│   └── CMakeLists.txt        # Stepper module build config
-├── mcp23017/                 # MCP23017 I/O expander integration
-│   ├── mcp23017.h/.c         # Core I/O expander driver
-│   ├── stepper_io_integration.h/.c  # Stepper power management
-│   └── CMakeLists.txt        # MCP23017 module build config
 └── libraries/                # External libraries (BSP, LVGL, FatFS)
     └── bsp/                  # Board support from Waveshare
 ```
@@ -67,7 +71,7 @@ PicoFlora/
 - **Activity Reset**: Any touch on stepper screen resets the timeout timer
 - **Smooth Transitions**: 500ms fade animation between screens
 
-### PIO-Based Stepper Motor Control with Power Management
+### PIO-Based Stepper Motor Control with Object-Oriented Power Management
 
 - **Pin Configuration**: GPIO 29 (step pin to TMC2209)
 - **PIO Implementation**: Hardware-timed square wave generation
@@ -77,7 +81,9 @@ PicoFlora/
 - **States**: Idle → Accelerating → Running → Decelerating → Completed
 - **Stepper Driver**: BigTreeTech TMC2209 for silent operation and precision control
 - **Pump Integration**: Boxer 9QX peristaltic pump for accurate water dosing
-- **Automatic Power Management**: MCP23017 I/O expander controls TMC2209 enable pin
+- **Object-Oriented GPIO**: MCP23017 class system with polymorphic pin objects
+- **Clean Abstraction**: Pin objects provide uniform interface for native GPIO and I/O expander pins
+- **Automatic Power Management**: MCP23017 pin object controls TMC2209 enable pin
 - **Power Savings**: Motor is only powered when actively running
 - **Smart Enable/Disable**: Automatic enable on start, disable on completion
 
@@ -181,9 +187,32 @@ PicoFlora/
 
 ## Code Architecture
 
+### Hardware Abstraction Layer (`drivers/`)
+
+**GPIO Abstraction System (`drivers/gpio_abstraction/`)**
+- **Polymorphic Pin Interface**: Function pointer-based abstraction allowing uniform access to different pin types
+- **gpio_pin_t Structure**: Core pin object with operations table for read, write, set_direction, etc.
+- **Native GPIO Support**: Direct hardware GPIO pin implementation 
+- **I/O Expander Support**: MCP23017 pin implementation using the same interface
+- **Clean API**: Single interface works with both native GPIO and I/O expander pins
+
+**MCP23017 Driver (`drivers/mcp23017/`)**
+- **Object-Oriented Design**: mcp23017_class_t provides device instance with managed pin collection
+- **Pin Array Management**: Each device maintains 16 pin objects accessible by pin number
+- **Automatic Initialization**: Device initialization sets up I2C communication and pin objects
+- **Polymorphic Pins**: Each MCP23017 pin implements the gpio_pin_t interface
+- **I2C Integration**: Seamless integration with BSP I2C system
+
+**Stepper Driver (`drivers/stepper/`)**
+- **PIO-Based Control**: Hardware-timed step generation using RP2350 PIO state machines
+- **MCP23017 Integration**: Uses pin objects for clean enable pin control
+- **Power Management**: Automatic stepper enable/disable through pin abstraction
+- **Modular Design**: Core driver and integration layer cleanly separated
+
 ### Main Application (`main.c`)
 - Initializes system clock to 220MHz
 - Sets up PCF85063 RTC with default time fallback
+- Initializes object-oriented GPIO and MCP23017 systems
 - Initializes multi-screen LVGL interface
 - Manages screen navigation and conditional updates
 - Runs main event loop with 5ms updates
@@ -194,28 +223,18 @@ PicoFlora/
 - **Lock Screen**: Complete date/time display with day of week, 12-hour format, and full date
 - **Responsive Design**: Touch-friendly centered layout
 
-### PIO Stepper Driver (`stepper/`)
+### PIO Stepper Driver (`drivers/stepper/`)
 - **PIO State Machine**: Hardware-timed square wave generation
 - **Adaptive Acceleration**: Smart acceleration scaling (200-1000 steps)
 - **Frequency Control**: Precise timing with divider calculations
 - **Position Tracking**: Real-time step counting and status reporting
+- **Object-Oriented Power Control**: Clean integration with MCP23017 pin objects
 
-## Future Enhancements for Plant Watering Station
 
-1. **Automated Watering Schedules**: Time-based watering with RTC integration and multiple daily cycles
-2. **Sensor Integration**: Soil moisture sensors for demand-based watering triggers
-3. **Multi-Plant Support**: Multiple pump channels with individual schedules and dosing profiles
-4. **Water Level Monitoring**: Reservoir level detection with low-water alerts
-5. **Environmental Monitoring**: Light level and temperature sensors using onboard QMI8658 IMU
-6. **Data Logging**: Historical watering events, sensor readings, and pump performance metrics
-7. **Wireless Connectivity**: Wi-Fi module for remote monitoring and control
-8. **Precision Dosing**: Calibrated pump control for fertilizer and nutrient solutions
-9. **User Interface Enhancements**: Settings screens for pump calibration and schedule configuration
-10. **SD Card Integration**: Long-term data storage and configuration backup using FatFS library
 
 ## Configuration Options
 
-Key parameters can be modified in `stepper/stepper_driver.h`:
+Key parameters can be modified in `drivers/stepper/stepper_driver.h`:
 
 ```c
 #define STEPPER_STEP_PIN 29          // GPIO pin for step signal
@@ -223,6 +242,24 @@ Key parameters can be modified in `stepper/stepper_driver.h`:
 #define STEPPER_MAX_FREQ_HZ 5000     // Maximum step frequency (PIO-based)
 #define ADAPTIVE_ACCEL_MIN 200       // Minimum acceleration steps
 #define ADAPTIVE_ACCEL_MAX 1000      // Maximum acceleration steps
+```
+
+MCP23017 configuration in `drivers/mcp23017/mcp23017_class.h`:
+
+```c
+#define MCP23017_PIN_COUNT 16        // Number of pins on MCP23017
+// Default I2C address for MCP23017 (configurable per device instance)
+```
+
+GPIO abstraction in `drivers/gpio_abstraction/gpio_abstraction.h`:
+
+```c
+// Function pointer operations for polymorphic pin behavior
+typedef struct gpio_pin_ops {
+    void (*write)(struct gpio_pin *pin, bool value);
+    bool (*read)(struct gpio_pin *pin);
+    void (*set_direction)(struct gpio_pin *pin, gpio_direction_t direction);
+} gpio_pin_ops_t;
 ```
 
 UI parameters in `lvgl/lvgl_screen/stepper_screen.h`:

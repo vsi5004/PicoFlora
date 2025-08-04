@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include "../gpio_abstraction/gpio_abstraction.h"
 
 /**
  * PIO-based Stepper Motor Driver
@@ -12,6 +13,7 @@
  * - Configurable step rates
  * - Non-blocking operation
  * - Real-time position feedback
+ * - Optional enable pin control (native GPIO or MCP23017)
  */
 
 // Configuration
@@ -41,6 +43,7 @@ typedef enum {
 
 // Function prototypes
 void stepper_driver_init(void);
+void stepper_driver_init_with_enable_pin(gpio_pin_t *enable_pin);
 void stepper_driver_start(int32_t target_steps);
 void stepper_driver_stop(void);
 void stepper_driver_update(void);

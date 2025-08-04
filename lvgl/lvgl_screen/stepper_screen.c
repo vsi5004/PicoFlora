@@ -4,8 +4,7 @@
 
 #include "stepper_screen.h"
 #include "screen_manager.h"
-#include "stepper_driver.h"
-#include "../../../mcp23017/stepper_io_integration.h"
+#include "../../drivers/stepper/stepper_driver.h"
 #include <stdio.h>
 
 // Screen objects
@@ -48,25 +47,22 @@ static void button_event_cb(lv_event_t * e) {
         screen_manager_handle_ui_event(e);
         
         if (stepper_driver_is_running()) {
-            // Stop the stepper motor with automatic driver disable
-            stepper_stop_with_disable();
+            // Stop the stepper motor (enable pin automatically disabled)
+            stepper_driver_stop();
             lv_label_set_text(lv_obj_get_child(start_stop_btn, 0), "START");
             stepper_screen_set_status("Stopped (Driver Disabled)");
             completion_handled = false; // Reset for next movement
         } else {
-            // Start the stepper motor with automatic driver enable
+            // Start the stepper motor (enable pin automatically enabled)
             int32_t target_steps = lv_slider_get_value(steps_slider);
             
-            if (stepper_start_with_enable(target_steps)) {
-                lv_label_set_text(lv_obj_get_child(start_stop_btn, 0), "STOP");
-                stepper_screen_set_status("Running");
-                completion_handled = false; // Reset completion flag for new movement
-                
-                // Reset progress bar
-                lv_bar_set_value(progress_bar, 0, LV_ANIM_OFF);
-            } else {
-                stepper_screen_set_status("Error: Failed to start");
-            }
+            stepper_driver_start(target_steps);
+            lv_label_set_text(lv_obj_get_child(start_stop_btn, 0), "STOP");
+            stepper_screen_set_status("Running");
+            completion_handled = false; // Reset completion flag for new movement
+            
+            // Reset progress bar
+            lv_bar_set_value(progress_bar, 0, LV_ANIM_OFF);
         }
     }
 }
@@ -153,13 +149,7 @@ void stepper_screen_update_progress(void) {
     // Update status when movement completes
     if (!is_running && current_steps > 0 && !completion_handled) {
         if (current_steps >= target_steps) {
-            // Disable the stepper driver to save power
-            mcp23017_device_t* io_expander = get_io_expander();
-            if (io_expander) {
-                mcp23017_stepper_disable(io_expander);
-                printf("MCP23017: Stepper driver disabled after completion\n");
-            }
-            
+            // Enable pin is automatically disabled by the stepper driver
             stepper_screen_set_status("Completed");
             stepper_screen_set_button_text("START");
             completion_handled = true; // Mark completion as handled

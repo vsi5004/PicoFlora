@@ -16,7 +16,7 @@ target_link_libraries(lvgl_screen
 
 target_include_directories(lvgl_screen PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../stepper
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../drivers/stepper
     ${CMAKE_CURRENT_SOURCE_DIR}/../../libraries/bsp
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../mcp23017
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../drivers/mcp23017
 )

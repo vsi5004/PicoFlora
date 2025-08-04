@@ -16,8 +16,10 @@
 #include "lvgl_screen/stepper_screen.h"
 #include "lvgl_screen/lock_screen.h"
 #include "lvgl_screen/screen_manager.h"
-#include "stepper/stepper_driver.h"
-#include "mcp23017/stepper_io_integration.h"
+#include "drivers/stepper/stepper_driver.h"
+#include "drivers/stepper/stepper_mcp23017.h"
+#include "drivers/gpio_abstraction/gpio_abstraction.h"
+#include "drivers/mcp23017/mcp23017_class.h"
 
 // Main configuration
 #define CPU_FREQ_KHZ 220000  // 220MHz
@@ -50,23 +52,12 @@ int main() {
     
     printf("PicoFlora - Smart Plant Watering Station Starting...\n");
     
-    // Initialize battery system first (required for display)
-    bsp_battery_init(100);
-    
     // Set CPU clock to 220MHz with proper peripheral clock setup
     set_cpu_clock(CPU_FREQ_KHZ);
-    
-    // Initialize I2C (required for touch controller)
     bsp_i2c_init();
-    
-    // Initialize LVGL port (display, touch, etc.)
     lv_port_init();
-    
-    // Initialize LCD brightness system
     bsp_lcd_brightness_init();
     bsp_lcd_brightness_set(80);
-    
-    // Initialize PCF85063 RTC
     bsp_pcf85063_init();
     
     // Check if RTC has valid time, set default if needed
@@ -84,11 +75,37 @@ int main() {
         bsp_pcf85063_set_time(&now_tm);
     }
     
-    // Initialize stepper motor driver
-    stepper_driver_init();
+    // Initialize GPIO abstraction layer
+    printf("Initializing GPIO abstraction layer...\n");
+    gpio_abstraction_init();
     
-    // Initialize MCP23017 I/O expander for stepper control
-    stepper_io_init();
+    // Initialize stepper motor driver with MCP23017 enable pin (object-oriented approach)
+    // Address 0x27, Pin 0 (A0) for stepper enable control
+    printf("Setting up stepper motor with MCP23017 enable control...\n");
+    if (!stepper_init_with_mcp23017_enable(0x27, 0)) {
+        printf("Warning: MCP23017 stepper enable failed, falling back to basic stepper init\n");
+        stepper_driver_init();  // Fallback to basic initialization
+    } else {
+        // Demonstrate object-oriented pin access
+        mcp23017_class_t *mcp_device = stepper_get_mcp23017_device();
+        gpio_pin_t *enable_pin = stepper_get_enable_pin();
+        
+        if (mcp_device && enable_pin) {
+            printf("Successfully created MCP23017 device and pin objects!\n");
+            printf("- MCP23017 device at address 0x%02X\n", 0x27);
+            printf("- Enable pin object ready for generic use\n");
+            
+            // Example: You could get additional pins from the same device
+            gpio_pin_t *status_pin = mcp23017_class_get_pin_a(mcp_device, 1);  // Pin A1 for status LED
+            if (status_pin) {
+                printf("- Additional pin objects available (e.g., status LED on A1)\n");
+                // Initialize as output for potential status indication
+                if (gpio_pin_init(status_pin, true)) {
+                    printf("- Status pin initialized as output\n");
+                }
+            }
+        }
+    }
     
     // Initialize screen manager
     screen_manager_init();
