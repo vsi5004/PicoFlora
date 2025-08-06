@@ -14,8 +14,10 @@
 #include "bsp_lcd_brightness.h"
 #include "bsp_pcf85063.h"
 #include "lvgl/lv_port/lv_port.h"
-#include "lvgl_screen/stepper_screen.h"
 #include "lvgl_screen/lock_screen.h"
+#include "lvgl_screen/main_screen.h"
+#include "lvgl_screen/stepper_screen.h"
+#include "lvgl_screen/time_settings_screen.h"
 #include "lvgl_screen/screen_manager.h"
 #include "drivers/stepper/stepper_driver.h"
 #include "drivers/stepper/stepper_mcp23017.h"
@@ -133,11 +135,17 @@ int main() {
     screen_manager_set_cpu_callback(cpu_frequency_change_callback);
     
     // Create the UI screens
+    lock_screen_create();
+    screen_manager_add_screen(SCREEN_LOCK, lock_screen_get_screen());
+    
+    main_screen_create();
+    screen_manager_add_screen(SCREEN_MAIN, main_screen_get_screen());
+    
     stepper_screen_create();
     screen_manager_add_screen(SCREEN_STEPPER, stepper_screen_get_screen());
     
-    lock_screen_create();
-    screen_manager_add_screen(SCREEN_LOCK, lock_screen_get_screen());
+    time_settings_screen_create();
+    screen_manager_add_screen(SCREEN_TIME_SETTINGS, time_settings_screen_get_screen());
     
     // Start with lock screen
     screen_manager_switch_to(SCREEN_LOCK);

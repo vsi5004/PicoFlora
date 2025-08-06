@@ -7,6 +7,7 @@
  */
 
 #include "screen_manager.h"
+#include "time_settings_screen.h"
 #include "../../drivers/logging/logging.h"
 #include <stdio.h>
 #include "pico/time.h"  // Add this for hardware-independent timing
@@ -73,10 +74,16 @@ void screen_manager_switch_to(screen_id_t screen_id) {
             if (screen_id == SCREEN_LOCK && current_screen != SCREEN_LOCK) {
                 // Switching to lock screen - reduce CPU after animation
                 lock_screen_start_time = to_ms_since_boot(get_absolute_time());  // Track when lock screen starts
-            } else if (screen_id == SCREEN_STEPPER && current_screen != SCREEN_STEPPER) {
-                // Switching to stepper screen - ensure high CPU (should already be set by touch handler)
+            } else if (screen_id != SCREEN_LOCK && current_screen != screen_id) {
+                // Switching to any active screen - ensure high CPU (should already be set by touch handler)
                 cpu_frequency_callback(CPU_FREQ_HIGH);
             }
+        }
+        
+        // Handle special screen initialization
+        if (screen_id == SCREEN_TIME_SETTINGS) {
+            // Load current RTC time into the time settings screen
+            time_settings_screen_load_current_time();
         }
         
         // Load the new screen with fade animation (500ms duration)
@@ -111,9 +118,9 @@ void screen_manager_prev_screen(void) {
 }
 
 void screen_manager_handle_touch(void) {
-    // Switch from lock screen to stepper screen on touch
+    // Switch from lock screen to main screen on touch
     if (current_screen == SCREEN_LOCK) {
-        screen_manager_switch_to(SCREEN_STEPPER);
+        screen_manager_switch_to(SCREEN_MAIN);
         screen_manager_reset_timeout();
     }
 }

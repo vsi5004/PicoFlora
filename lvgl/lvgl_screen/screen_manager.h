@@ -12,7 +12,9 @@
 
 typedef enum {
     SCREEN_LOCK = 0,
+    SCREEN_MAIN,
     SCREEN_STEPPER,
+    SCREEN_TIME_SETTINGS,
     SCREEN_COUNT
 } screen_id_t;
 

@@ -2,8 +2,10 @@ cmake_minimum_required(VERSION 3.13)
 
 # Create LVGL screen library
 add_library(lvgl_screen
-    stepper_screen.c
     lock_screen.c
+    main_screen.c
+    stepper_screen.c
+    time_settings_screen.c
     screen_manager.c
 )
 
